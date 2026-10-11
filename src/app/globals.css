@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+:root {
+  --background: #12140f;
+  --foreground: #e7e5e4;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* ---------- Reward dialog ---------- */
+
+.confetti-piece {
+  opacity: 0;
+  animation-name: confetti-fall;
+  animation-timing-function: cubic-bezier(0.25, 0.6, 0.5, 1);
+  animation-fill-mode: forwards;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, -20px, 0) rotate(0deg);
+  }
+  100% {
+    opacity: 0.9;
+    transform: translate3d(var(--drift, 0px), 105vh, 0) rotate(720deg);
+  }
+}
+
+.reward-pop {
+  animation: reward-pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes reward-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.reward-bounce {
+  animation: reward-bounce 1.2s ease-in-out infinite;
+}
+
+@keyframes reward-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.08);
+  }
+}
+
+.reward-item {
+  animation: reward-item 0.5s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+@keyframes reward-item {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-12deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+.reward-rays {
+  background: repeating-conic-gradient(rgba(251, 191, 36, 0.18) 0deg 10deg, transparent 10deg 20deg);
+  mask-image: radial-gradient(circle, black 0%, transparent 70%);
+  animation: reward-spin 12s linear infinite;
+}
+
+@keyframes reward-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti-piece,
+  .reward-rays,
+  .reward-bounce {
+    animation: none;
+    display: none;
+  }
+}
