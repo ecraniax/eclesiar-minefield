@@ -160,13 +160,18 @@ export default function Game() {
         return;
       }
       if (defuseMode) {
-        run(() => api.defuse(x, y)).then((o) => o?.res.ok && setDefuseMode(false));
+        run(() => api.defuse(x, y)).then((o) => {
+          if (!o?.res.ok) return;
+          setDefuseMode(false);
+          // a wrong defuse throws the soldier out of the blast area
+          if (o.res.report?.thrownTo) centerOn(o.state.player.x, o.state.player.y);
+        });
         return;
       }
       if (x === state.player.x && y === state.player.y) return;
       move(x, y);
     },
-    [api, state, tool, defuseMode, run, move],
+    [api, state, tool, defuseMode, run, move, centerOn],
   );
 
   // Right-click / long press: only cancels the selected tool or defuse
@@ -295,7 +300,7 @@ export default function Game() {
           <div className="pointer-events-none absolute inset-x-0 bottom-14 flex justify-center px-2">
             <div className="rounded-md border border-red-500 bg-stone-950/90 px-4 py-2 text-center text-sm text-red-200 shadow-lg">
               <DefuseIcon size={18} /> <b>Defuse mode</b> – click a red cell next to your soldier. No mine there = blast ({DEFUSE_BLAST_RADIUS * 2 + 1}×
-              {DEFUSE_BLAST_RADIUS * 2 + 1}) + lockout. Esc to cancel.
+              {DEFUSE_BLAST_RADIUS * 2 + 1}, impassable afterwards) + lockout. Esc to cancel.
             </div>
           </div>
         )}
@@ -601,14 +606,13 @@ function ReportCard({ report }: { report: StepReport }) {
   if (report.defused === false) {
     return (
       <div className="rounded-md border border-red-700 bg-red-950/90 px-4 py-2 text-sm text-red-100 shadow-lg">
-        💥 <b>No mine at ({report.x}|{report.y})!</b> The defuse charge blew up the area.{lost}
-      </div>
-    );
-  }
-  if (report.rubble) {
-    return (
-      <div className="rounded-md border border-stone-600 bg-stone-950/90 px-4 py-2 text-sm text-stone-300 shadow-lg">
-        🪨 <b>Rubble</b> at ({report.x}|{report.y}) – no information here.
+        💥 <b>No mine at ({report.x}|{report.y})!</b> The defuse charge blew up the area – it can no longer be crossed.{lost}
+        {report.thrownTo && (
+          <>
+            {" "}
+            The blast threw you to ({report.thrownTo.x}|{report.thrownTo.y}).
+          </>
+        )}
       </div>
     );
   }
@@ -687,7 +691,11 @@ function describeCell(state: PublicState, x: number, y: number) {
             ? "smoke – mine count hidden"
             : v === 11
               ? "bridge"
-              : `${v} mine${v === 1 ? "" : "s"} around${sig > 0 ? ` · ${SIGNAL_LABEL[sig]}` : ""}`;
+              : v === 12
+                ? "defused mine"
+                : v === 13
+                  ? "destroyed by a defuse blast – impassable"
+                  : `${v} mine${v === 1 ? "" : "s"} around${sig > 0 ? ` · ${SIGNAL_LABEL[sig]}` : ""}`;
   return (
     <span>
       ({x}|{y}) · {TERRAIN_INFO[WORLD.terrain[i]].name} · {ring.name} · {what}

@@ -15,7 +15,7 @@ export const CELL_SMOKE = 10;
 export const CELL_BRIDGE = 11;
 /** Successfully defused mine: walkable cell. */
 export const CELL_DEFUSED = 12;
-/** Rubble after a wrong defuse: walkable, no information. */
+/** Rubble after a wrong defuse: impassable. */
 export const CELL_RUBBLE = 13;
 
 export type LockReason = "mine" | "defuse" | "steps";
@@ -87,8 +87,8 @@ export interface StepReport {
   destroyed?: number;
   /** Walked onto an already defused mine cell. */
   onDefused?: boolean;
-  /** Walked onto rubble (no information). */
-  rubble?: boolean;
+  /** Wrong defuse: where the blast threw the soldier (outside the destroyed area). */
+  thrownTo?: { x: number; y: number };
 }
 
 export interface PublicState {

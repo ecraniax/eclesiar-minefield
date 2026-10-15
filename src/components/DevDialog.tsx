@@ -252,7 +252,7 @@ CREATE TABLE event_purchase (
               Almost every cell is just &quot;explored&quot; or &quot;not explored&quot; → 1 bit per cell. Rare statuses (crater, defused
               mine, rubble, bridge) go into a short list.
             </p>
-            <Code>{`opened  : bytea(${BITSET_BYTES})       bit i = 1  → cell i is walkable (explored / bridge / defused / rubble)
+            <Code>{`opened  : bytea(${BITSET_BYTES})       bit i = 1  → cell i is walkable (explored / bridge / defused)
 special : bytea                 sequence of 3-byte records [i (uint16), status (uint8)]
                                 status: 1 crater, 2 defused mine, 3 rubble, 4 bridge
 
@@ -334,9 +334,12 @@ BEGIN … FOR UPDATE, lazySync, check lockout, adjacency, HIDDEN (same as move)
       addSpecial(p, i, DEFUSED); p.mines_defused += 1     -- the cell becomes walkable
   else:
       for every cell j in the ${DEFUSE_BLAST_RADIUS * 2 + 1}×${DEFUSE_BLAST_RADIUS * 2 + 1} area around (x,y):
-          if status(j) == HIDDEN and not river(j) and not general(j) and ring unlocked:
-              addSpecial(p, j, RUBBLE)
+          if not river(j) and not general(j) and ring unlocked:
+              setOpen(p, j, false); addSpecial(p, j, RUBBLE)        -- impassable, explored cells too
       destroyTreasuresAround(p, x, y, radius=${DEFUSE_BLAST_RADIUS}, includeLegendary=true)
+      -- the soldier stood inside the area: move them to the nearest walkable cell outside it
+      -- (rings r+1 … r+6 around (x,y), closest to the old position); none → open a safe cell on ring r+1
+      (p.px, p.py) = escapeBlast(p, x, y, radius=${DEFUSE_BLAST_RADIUS})
       lock(p, DEFUSE, now)
   UPDATE …; COMMIT`}</Code>
           </Section>

@@ -229,6 +229,11 @@ export class MockServer {
     this.detector = new Map(this.d.detector);
     this.crates = new Map(this.d.crates);
     this.buildMines();
+    // Older saves: rubble used to be walkable – a soldier standing on it is moved out
+    if (!isNew && !this.isWalkable(idx(this.d.px, this.d.py))) {
+      this.escapeBlast(this.d.px, this.d.py, 0);
+      this.save();
+    }
     if (isNew) {
       this.cells[idx(CENTER, CENTER)] = S_OPEN;
       this.d.lastReport = this.makeReport(CENTER, CENTER);
@@ -329,7 +334,7 @@ export class MockServer {
 
   private isWalkable(i: number) {
     const s = this.cells[i];
-    return s === S_OPEN || s === S_BRIDGE || s === S_DEFUSED || s === S_RUBBLE;
+    return s === S_OPEN || s === S_BRIDGE || s === S_DEFUSED;
   }
 
   /** A live mine (not defused / destroyed / exploded). */
@@ -588,13 +593,13 @@ export class MockServer {
     const s = this.cells[i];
 
     if (s === S_EXPLODED) return this.fail("That's a crater from an exploded mine – go around it.");
+    if (s === S_RUBBLE) return this.fail("That area was destroyed by a defuse blast – go around it.");
     if (this.isWalkable(i)) {
       if (!this.pathExists(x, y)) return this.fail("There is no cleared path to that cell.");
       this.d.px = x;
       this.d.py = y;
       // The report always describes the cell the soldier stands on – also when walking over explored cells
-      const report: StepReport =
-        s === S_RUBBLE ? { x, y, mines: null, signal: 0, rubble: true } : this.makeReport(x, y, s === S_DEFUSED ? { onDefused: true } : undefined);
+      const report = this.makeReport(x, y, s === S_DEFUSED ? { onDefused: true } : undefined);
       this.d.lastReport = report;
       this.save();
       return { ok: true, report };
@@ -633,8 +638,8 @@ export class MockServer {
   /**
    * Defuse a cell right next to the soldier. Free – it costs no step (a wrong defuse is punished by the lockout).
    * - Mine present: defused, the cell becomes walkable.
-   * - No mine: the charge explodes, unexplored cells within DEFUSE_BLAST_RADIUS turn to rubble,
-   *   treasure in that area (legendary too) is destroyed and a lockout follows.
+   * - No mine: the charge explodes and every cell within DEFUSE_BLAST_RADIUS (explored ones too) turns to impassable rubble,
+   *   treasure in that area (legendary too) is destroyed, the soldier is thrown to the edge of the blast and a lockout follows.
    */
   defuse(x: number, y: number): ActionResult {
     this.sync();
@@ -664,10 +669,11 @@ export class MockServer {
         for (let xx = x - r; xx <= x + r; xx++) {
           if (!inBounds(xx, yy)) continue;
           const j = idx(xx, yy);
-          if (this.cells[j] !== S_HIDDEN || WORLD.river[j] || isGeneralCell(xx, yy) || !ringUnlocked(xx, yy, this.day)) continue;
+          if (this.cells[j] === S_RUBBLE || WORLD.river[j] || isGeneralCell(xx, yy) || !ringUnlocked(xx, yy, this.day)) continue;
           this.cells[j] = S_RUBBLE;
           this.dogSafe.delete(j);
           this.dogMine.delete(j);
+          this.detector.delete(j);
           rubble++;
         }
       const destroyed = this.destroyTreasure(x, y, r, true);
@@ -675,12 +681,51 @@ export class MockServer {
         "danger",
         `No mine at (${x}|${y})! The defuse charge blew up ${rubble} cells${destroyed ? ` and destroyed ${destroyed} treasure${destroyed > 1 ? "s" : ""}` : ""}.`,
       );
+      const to = this.escapeBlast(x, y, r);
+      this.addLog("info", `The blast threw you to (${to.x}|${to.y}), at the edge of the blast area.`);
       this.lock("defuse");
-      report = { x, y, mines: null, signal: 0, defused: false, destroyed };
+      report = { x, y, mines: null, signal: 0, defused: false, destroyed, thrownTo: to };
     }
     this.d.lastReport = report;
     this.save();
     return { ok: true, report, flash };
+  }
+
+  /**
+   * Moves the soldier out of a destroyed area: to the nearest walkable cell outside the (2r+1)×(2r+1) blast square.
+   * If there is none close by, a safe cell right at the edge of the blast is opened for free, so the player can always continue.
+   */
+  private escapeBlast(bx: number, by: number, r: number): { x: number; y: number } {
+    const { px, py } = this.d;
+    const pick = (ok: (j: number) => boolean) => {
+      for (let ring = r + 1; ring <= r + 6; ring++) {
+        let best: { x: number; y: number; d: number } | null = null;
+        for (let y = by - ring; y <= by + ring; y++)
+          for (let x = bx - ring; x <= bx + ring; x++) {
+            if (cheb(x, y, bx, by) !== ring || !inBounds(x, y) || isGeneralCell(x, y) || !ringUnlocked(x, y, this.day)) continue;
+            if (!ok(idx(x, y))) continue;
+            const d = (x - px) ** 2 + (y - py) ** 2;
+            if (!best || d < best.d) best = { x, y, d };
+          }
+        if (best) return best;
+      }
+      return null;
+    };
+    let to = pick((j) => this.isWalkable(j));
+    if (!to) {
+      // Nothing explored nearby: open a safe cell at the edge of the blast
+      to = pick((j) => this.cells[j] === S_HIDDEN && !WORLD.river[j] && !this.mines[j]);
+      if (to) this.cells[idx(to.x, to.y)] = S_OPEN;
+    }
+    if (!to) {
+      // Practically unreachable: back to camp
+      to = { x: CENTER, y: CENTER, d: 0 };
+      this.cells[idx(CENTER, CENTER)] = S_OPEN;
+    }
+    this.dogSafe.delete(idx(to.x, to.y));
+    this.d.px = to.x;
+    this.d.py = to.y;
+    return { x: to.x, y: to.y };
   }
 
   useTool(tool: ToolId, x: number, y: number): ActionResult {

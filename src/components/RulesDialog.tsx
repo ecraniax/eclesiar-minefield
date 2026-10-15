@@ -157,8 +157,9 @@ export default function RulesDialog({ onClose }: { onClose: () => void }) {
                 The mine is defused and the cell becomes safe to walk on – an explored cell that cost you no step.
               </Card>
               <Card title="💥 There was no mine" tone="bad">
-                The charge explodes: every unexplored cell in a {blast}×{blast} area turns to rubble, <b>all treasure there is destroyed</b>{" "}
-                (legendary too) and you are locked out for {hoursText}.
+                The charge explodes: every cell in a {blast}×{blast} area (explored ones too) turns to <b>impassable rubble</b>,{" "}
+                <b>all treasure there is destroyed</b> (legendary too) and you are locked out for {hoursText}. The blast throws your soldier
+                to the nearest explored cell at the edge of the area, so you can carry on around it.
               </Card>
             </div>
           </Section>

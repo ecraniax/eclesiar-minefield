@@ -192,8 +192,12 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: DrawOpts) {
           ctx.fillText("💥", sx + cp / 2, sy + cp / 2);
         }
       } else if (v === CELL_RUBBLE) {
-        ctx.fillStyle = alt ? "#3f3a35" : "#3a3530";
+        // scorched, impassable
+        ctx.fillStyle = alt ? "#2b2420" : "#26201c";
         ctx.fillRect(sx, sy, cp + 0.5, cp + 0.5);
+        ctx.strokeStyle = "rgba(120,53,15,0.55)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(sx + 0.5, sy + 0.5, cp - 1, cp - 1);
         if (showDetail) {
           ctx.globalAlpha = 0.7;
           ctx.font = `${cp * 0.4}px sans-serif`;
